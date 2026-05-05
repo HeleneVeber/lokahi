@@ -1,2 +1,17 @@
-  CLAUDE.md
+CLAUDE.md
 
+# environnement virtuel
+.venv/
+
+# données locales
+data/
+*.db
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.env
+
+# Streamlit
+.streamlit/secrets.toml
