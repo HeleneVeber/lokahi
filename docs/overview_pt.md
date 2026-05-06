@@ -40,10 +40,15 @@ Um mesmo login pode representar uma imobiliária com vários colaboradores.
 ```text
 GESTOR (pessoa — proprietário ou gestor de imóvel)
 └── id, nome, cpf/cnpj, telefone
-└── terá conta bancária [futuro]
+└── [futuro] conta_bancaria_id*
+└── [futuro] address_id*
 └── boletos gerados em seu nome via conta bancária
 
+ADDRESS [futuro — a criar com ViaCEP]
+└── id, cep, logradouro, numero, complemento, bairro, cidade, estado
+
 IMÓVEL
+└── id, nome, address_id*
 └── vinculado a um ou mais gestores (many-to-many)
 └── [futuro — a decidir] papel na ligação: proprietario | gestor
 └── tem vários quartos
