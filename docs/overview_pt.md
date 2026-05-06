@@ -38,17 +38,14 @@ Um mesmo login pode representar uma imobiliária com vários colaboradores.
 ## Modelo de Dados
 
 ```text
-PROPRIETÁRIO
-└── pode ter vários imóveis (many-to-many)
+GESTOR (pessoa — proprietário ou gestor de imóvel)
+└── id, nome, cpf/cnpj, telefone
 └── terá conta bancária [futuro]
-
-GESTOR
-└── pode gerenciar vários imóveis de diferentes proprietários (many-to-many)
-└── terá conta bancária [futuro]
+└── boletos gerados em seu nome via conta bancária
 
 IMÓVEL
-└── pertence a um ou mais proprietários
-└── gerenciado por um ou mais gestores
+└── vinculado a um ou mais gestores (many-to-many)
+└── [futuro — a decidir] papel na ligação: proprietario | gestor
 └── tem vários quartos
 
 QUARTO
