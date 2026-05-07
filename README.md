@@ -30,7 +30,7 @@ uv sync
 
 ## Run the app
 
-```
+```bash
 uv run streamlit run app/main.py
 ```
 

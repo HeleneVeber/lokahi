@@ -1,0 +1,79 @@
+import streamlit as st
+from sqlalchemy.exc import IntegrityError
+from sqlmodel import select
+from app.database import create_db_and_tables, get_session
+from app.models.gestor import Gestor
+
+
+st.title("Gestores de Coliving 🏠")
+st.write("Aqui você pode ler e gerenciar os gestores de coliving")
+
+
+# DB connection
+create_db_and_tables()
+session = get_session()
+gestores = session.exec(select(Gestor)).all()
+session.close()
+
+
+# Initialize session state
+if "show_form" not in st.session_state:
+    st.session_state.show_form = False
+
+if "show_upload" not in st.session_state:
+    st.session_state.show_upload = False
+
+
+# Display gestores in a table 
+if gestores:
+    event = st.dataframe(
+        [{"Nome": g.name, "CPF/CNPJ": g.cpf_cnpj, "Telefone": g.phone} for g in gestores],
+    )
+else:
+    st.info("Nenhum gestor cadastrado.")
+
+
+# Show buttons sude by side
+col1, col2 = st.columns(2)
+
+with col1:
+    if st.button("+ Novo Gestor", width="stretch"):
+        st.session_state.show_form = True
+
+with col2:
+    if st.button("+ Importar Gestores", width="stretch"):
+        st.session_state.show_upload = True
+
+
+# Form to add new gestor
+if st.session_state.show_form:
+    with st.form("form_novo_gestor"):
+        name = st.text_input("Nome Completo")
+        cpf_cnpj = st.text_input("CPF ou CNPJ")
+        phone = st.text_input("Telefone")
+        submitted = st.form_submit_button("Salvar")
+
+        if submitted:
+            try:
+                gestor = Gestor(name=name, cpf_cnpj=cpf_cnpj, phone=phone)
+                session = get_session()
+                session.add(gestor)
+                session.commit()
+                session.close()
+                st.success(f"Gestor {name} adicionado com sucesso!")
+                st.session_state.show_form = False
+                st.rerun()
+            except ValueError as e:
+                st.error(str(e))
+            except IntegrityError:
+                st.error("Este CPF/CNPJ já está cadastrado.")
+            except Exception as e:
+                st.error(f"Erro ao salvar: {str(e)}")
+
+
+# Placeholder for upload functionality
+if st.session_state.show_upload:
+    uploaded_file = st.file_uploader("Upload CSV, XLS, XLSX", type=["csv", "xls", "xlsx"])
+    if uploaded_file is not None:
+        st.warning("Importação ainda não implementada.")
+

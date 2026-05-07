@@ -4,6 +4,7 @@ from validate_docbr import CNPJ, CPF
 
 
 class Gestor(SQLModel, table=True):
+    __table_args__ = {"extend_existing": True}
     id: int | None = Field(default=None, primary_key=True)
     name: str
     cpf_cnpj: str = Field(unique=True)
