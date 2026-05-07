@@ -3,6 +3,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlmodel import select
 from app.database import create_db_and_tables, get_session
 from app.models.gestor import Gestor
+from app.utils.import_gestor import import_gestores
 
 
 st.title("Gestores de Coliving 🏠")
@@ -24,10 +25,17 @@ if "show_upload" not in st.session_state:
     st.session_state.show_upload = False
 
 
-# Display gestores in a table 
+# Display gestores in a table
 if gestores:
-    event = st.dataframe(
-        [{"Nome": g.name, "CPF/CNPJ": g.cpf_cnpj, "Telefone": g.phone} for g in gestores],
+    st.dataframe(
+        [
+            {
+                "Nome": g.name,
+                "CPF/CNPJ": g.cpf_cnpj,
+                "Telefone": g.phone if g.phone else None,
+            }
+            for g in gestores
+        ],
     )
 else:
     st.info("Nenhum gestor cadastrado.")
@@ -73,7 +81,22 @@ if st.session_state.show_form:
 
 # Placeholder for upload functionality
 if st.session_state.show_upload:
-    uploaded_file = st.file_uploader("Upload CSV, XLS, XLSX", type=["csv", "xls", "xlsx"])
+    uploaded_file = st.file_uploader(
+        "Importar CSV, XLS, XLSX", type=["csv", "xls", "xlsx"]
+    )
+    st.caption("Colunas obrigatórias: `name`, `cpf_cnpj` — opcional: `phone`")
     if uploaded_file is not None:
-        st.warning("Importação ainda não implementada.")
+        if st.button("Confirmar importação"):
+            st.session_state.import_result = import_gestores(uploaded_file)
+            st.session_state.show_upload = False
+            st.rerun()
 
+
+# Show import result if available
+if "import_result" in st.session_state:
+    result = st.session_state.pop("import_result")
+    if result["imported"] > 0:
+        st.success(f"{result['imported']} gestor(es) importado(s) com sucesso!")
+    for err in result["errors"]:
+        label = f"{err['row']} — " if err["row"] else ""
+        st.error(f"{label}{err['error']}")
