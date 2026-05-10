@@ -11,3 +11,6 @@ class Address(SQLModel, table=True):
     bairro: str
     cidade: str
     estado: str
+
+    def format(self) -> str:
+        return f"{self.logradouro}, {self.numero} — {self.bairro}, {self.cidade}"
