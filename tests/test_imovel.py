@@ -14,8 +14,8 @@ ADDRESS_DATA = {
     "logradouro": "Avenida Paulista",
     "numero": "1578",
     "bairro": "Bela Vista",
-    "cidade": "São Paulo",
-    "estado": "SP",
+    "localidade": "São Paulo",
+    "uf": "SP",
 }
 
 

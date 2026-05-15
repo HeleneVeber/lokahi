@@ -24,9 +24,9 @@ def test_fetch_address_valid_cep():
     with patch("app.utils.viacep.requests.get", return_value=_mock_response(VIACEP_RESPONSE)):
         result = fetch_address("01310-100")
 
-    assert result["logradouro"] == "Avenida Paulista"
-    assert result["localidade"] == "São Paulo"
-    assert result["uf"] == "SP"
+    assert result.logradouro == "Avenida Paulista"
+    assert result.localidade == "São Paulo"
+    assert result.uf == "SP"
 
 
 def test_fetch_address_strips_formatting():

@@ -3,7 +3,11 @@ import pandas as pd
 
 def import_file(file, model_class):
     df = _read_dataframe(file)
+    if isinstance(df, dict):
+        return df
     valid, errors = model_class.validate_rows(df)
+    if not valid:
+        return {"imported": 0, "errors": errors}
     imported, db_errors = model_class.save_many(valid)
     return {"imported": imported, "errors": errors + db_errors}
 

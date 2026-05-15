@@ -1,7 +1,8 @@
 import requests
+from app.types import ViaCepData
 
 
-def fetch_address(cep: str) -> dict:
+def fetch_address(cep: str) -> ViaCepData:
     cep = cep.replace("-", "").replace(" ", "")
     url = f"https://viacep.com.br/ws/{cep}/json/"
     response = requests.get(url)
@@ -10,4 +11,4 @@ def fetch_address(cep: str) -> dict:
     data = response.json()
     if "erro" in data:
         raise ValueError(f"CEP não encontrado: {cep}")
-    return data
+    return ViaCepData(**data)
