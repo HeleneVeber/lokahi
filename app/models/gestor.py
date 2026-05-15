@@ -2,10 +2,11 @@ import re
 from typing import Self
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import validates
-from sqlmodel import Field, SQLModel
+from sqlmodel import Field, SQLModel, select
 from validate_docbr import CNPJ, CPF
 from app.database import get_session
 from app.utils.import_utils import parse_phone
+from app.types import GestorData
 
 
 class Gestor(SQLModel, table=True):
@@ -23,6 +24,26 @@ class Gestor(SQLModel, table=True):
         if len(digits) == 14 and CNPJ().validate(value):
             return value
         raise ValueError("CPF/CNPJ inválido")
+
+    @classmethod
+    def get_or_create(cls, session, gestor: GestorData) -> "Gestor":
+        existing = session.exec(
+            select(cls).where(
+                cls.cpf_cnpj == gestor.cpf_cnpj
+                )
+            ).first()
+        if existing:
+            return existing
+
+        if not gestor.name:
+            raise ValueError(f"Nome obrigatório para novo gestor com CPF/CNPJ {gestor.cpf_cnpj}")
+
+        new = cls(**gestor.model_dump())
+        session.add(new)
+        session.flush()
+
+        return new
+
 
     # Check if the file are all required columns and if the values are valid (e.g. cpf_cnpj format, phone number)
     @classmethod
@@ -71,6 +92,6 @@ class Gestor(SQLModel, table=True):
                         session.flush()
                     imported += 1
                 except IntegrityError:
-                    errors.append({"row": instance.name, "error": "CPF/CNPJ já existe"})
+                    errors.append({"row": instance.name, "error": "CPF/CNPJ já cadastrado"})
             session.commit()
         return imported, errors

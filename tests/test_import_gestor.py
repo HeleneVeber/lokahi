@@ -3,7 +3,7 @@ import openpyxl
 from unittest.mock import patch
 from sqlmodel import SQLModel, Session, create_engine, select
 from app.models.gestor import Gestor
-from app.utils.import_gestor import import_gestores
+from app.utils.import_utils import import_file
 
 
 engine = create_engine("sqlite:///:memory:")
@@ -22,8 +22,8 @@ def test_import_valid_csv():
     file = io.BytesIO(csv_content)
     file.name = "test.csv"
 
-    with patch("app.utils.import_gestor.get_session", return_value=Session(engine)):
-        result = import_gestores(file)
+    with patch("app.models.gestor.get_session", return_value=Session(engine)):
+        result = import_file(file, Gestor)
 
     assert result["imported"] == 2
     assert result["errors"] == []
@@ -38,8 +38,8 @@ def test_import_without_phone():
     file = io.BytesIO(csv_content)
     file.name = "test.csv"
 
-    with patch("app.utils.import_gestor.get_session", return_value=Session(engine)):
-        result = import_gestores(file)
+    with patch("app.models.gestor.get_session", return_value=Session(engine)):
+        result = import_file(file, Gestor)
 
     assert result["imported"] == 1
     assert result["errors"] == []
@@ -54,8 +54,8 @@ def test_import_with_empty_phone_cell():
     file = io.BytesIO(csv_content)
     file.name = "test.csv"
 
-    with patch("app.utils.import_gestor.get_session", return_value=Session(engine)):
-        result = import_gestores(file)
+    with patch("app.models.gestor.get_session", return_value=Session(engine)):
+        result = import_file(file, Gestor)
 
     assert result["imported"] == 1
 
@@ -69,8 +69,8 @@ def test_import_invalid_cpf():
     file = io.BytesIO(csv_content)
     file.name = "test.csv"
 
-    with patch("app.utils.import_gestor.get_session", return_value=Session(engine)):
-        result = import_gestores(file)
+    with patch("app.models.gestor.get_session", return_value=Session(engine)):
+        result = import_file(file, Gestor)
 
     assert result["imported"] == 1
     assert len(result["errors"]) == 1
@@ -82,8 +82,8 @@ def test_import_duplicate_cpf():
     file = io.BytesIO(csv_content)
     file.name = "test.csv"
 
-    with patch("app.utils.import_gestor.get_session", return_value=Session(engine)):
-        result = import_gestores(file)
+    with patch("app.models.gestor.get_session", return_value=Session(engine)):
+        result = import_file(file, Gestor)
 
     assert result["imported"] == 1
     assert len(result["errors"]) == 1
@@ -95,8 +95,8 @@ def test_import_missing_column():
     file = io.BytesIO(csv_content)
     file.name = "test.csv"
 
-    with patch("app.utils.import_gestor.get_session", return_value=Session(engine)):
-        result = import_gestores(file)
+    with patch("app.models.gestor.get_session", return_value=Session(engine)):
+        result = import_file(file, Gestor)
 
     assert result["imported"] == 0
     assert len(result["errors"]) == 1
@@ -133,8 +133,8 @@ def test_import_valid_xlsx():
         ]
     )
 
-    with patch("app.utils.import_gestor.get_session", return_value=Session(engine)):
-        result = import_gestores(file)
+    with patch("app.models.gestor.get_session", return_value=Session(engine)):
+        result = import_file(file, Gestor)
 
     assert result["imported"] == 2
     assert result["errors"] == []
@@ -147,8 +147,8 @@ def test_import_xlsx_without_phone():
         ]
     )
 
-    with patch("app.utils.import_gestor.get_session", return_value=Session(engine)):
-        result = import_gestores(file)
+    with patch("app.models.gestor.get_session", return_value=Session(engine)):
+        result = import_file(file, Gestor)
 
     assert result["imported"] == 1
     with Session(engine) as session:
@@ -160,8 +160,8 @@ def test_import_unsupported_format():
     file = io.BytesIO(b"some content")
     file.name = "data.txt"
 
-    with patch("app.utils.import_gestor.get_session", return_value=Session(engine)):
-        result = import_gestores(file)
+    with patch("app.models.gestor.get_session", return_value=Session(engine)):
+        result = import_file(file, Gestor)
 
     assert result["imported"] == 0
     assert len(result["errors"]) == 1

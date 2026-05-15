@@ -1,6 +1,7 @@
 from sqlmodel import SQLModel, Session, create_engine, select
 
 from app.models.address import Address
+from app.types import AddressData
 
 engine = create_engine("sqlite:///:memory:")
 
@@ -9,8 +10,8 @@ ADDRESS_DATA = {
     "logradouro": "Avenida Paulista",
     "numero": "1578",
     "bairro": "Bela Vista",
-    "cidade": "São Paulo",
-    "estado": "SP",
+    "localidade": "São Paulo",
+    "uf": "SP",
 }
 
 
@@ -56,7 +57,7 @@ def test_read_address():
 
     assert found is not None
     assert found.cep == "01310-100"
-    assert found.cidade == "São Paulo"
+    assert found.localidade == "São Paulo"
 
 
 def test_update_address():
@@ -91,3 +92,56 @@ def test_delete_address():
         deleted = session.get(Address, address_id)
 
     assert deleted is None
+
+
+def test_get_or_create_creates_new():
+    with Session(engine) as session:
+        address = Address.get_or_create(session, AddressData(**{**ADDRESS_DATA, "numero": "100"}))
+        session.commit()
+        address_id = address.id
+
+    with Session(engine) as session:
+        all_addresses = session.exec(select(Address)).all()
+    assert len(all_addresses) == 1
+    assert all_addresses[0].id == address_id
+
+
+def test_get_or_create_returns_existing():
+    with Session(engine) as session:
+        existing = Address(**ADDRESS_DATA)
+        session.add(existing)
+        session.commit()
+        existing_id = existing.id
+
+    with Session(engine) as session:
+        address = Address.get_or_create(session, AddressData(**ADDRESS_DATA))
+        session.commit()
+        address_id = address.id
+
+    with Session(engine) as session:
+        all_addresses = session.exec(select(Address)).all()
+    assert len(all_addresses) == 1
+    assert address_id == existing_id
+
+
+def test_get_or_create_same_cep_different_numero():
+    with Session(engine) as session:
+        Address.get_or_create(session, AddressData(**{**ADDRESS_DATA, "numero": "100"}))
+        session.commit()
+
+    with Session(engine) as session:
+        Address.get_or_create(session, AddressData(**{**ADDRESS_DATA, "numero": "200"}))
+        session.commit()
+
+    with Session(engine) as session:
+        all_addresses = session.exec(select(Address)).all()
+    assert len(all_addresses) == 2
+
+
+def test_get_or_create_with_complemento():
+    with Session(engine) as session:
+        address = Address.get_or_create(session, AddressData(**{**ADDRESS_DATA, "numero": "100", "complemento": "Apto 1"}))
+        session.commit()
+        complemento = address.complemento
+
+    assert complemento == "Apto 1"
