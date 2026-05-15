@@ -3,7 +3,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlmodel import select
 from app.database import create_db_and_tables, get_session
 from app.models.gestor import Gestor
-from app.utils.import_gestor import import_gestores
+from app.utils.import_utils import import_file
 
 
 st.title("Gestores de Coliving 🏠")
@@ -87,7 +87,7 @@ if st.session_state.show_upload:
     st.caption("Colunas obrigatórias: `name`, `cpf_cnpj` — opcional: `phone`")
     if uploaded_file is not None:
         if st.button("Confirmar importação"):
-            st.session_state.import_result = import_gestores(uploaded_file)
+            st.session_state.import_result = import_file(uploaded_file, Gestor)
             st.session_state.show_upload = False
             st.rerun()
 

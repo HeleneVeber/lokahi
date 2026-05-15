@@ -361,6 +361,7 @@ source = { editable = "." }
 dependencies = [
     { name = "openpyxl" },
     { name = "pandas" },
+    { name = "requests" },
     { name = "sqlmodel" },
     { name = "streamlit" },
     { name = "validate-docbr" },
@@ -376,6 +377,7 @@ dev = [
 requires-dist = [
     { name = "openpyxl", specifier = ">=3.1.5" },
     { name = "pandas", specifier = ">=3.0.2" },
+    { name = "requests", specifier = ">=2.33.1" },
     { name = "sqlmodel", specifier = ">=0.0.38" },
     { name = "streamlit", specifier = ">=1.57.0" },
     { name = "validate-docbr", specifier = ">=2.0.0" },
