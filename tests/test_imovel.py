@@ -3,7 +3,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlmodel import SQLModel, Session, create_engine
 
 from app.models.address import Address
-from app.models.gestor import Gestor
+from app.models import Gestor
 from app.models.imovel import Imovel
 
 engine = create_engine("sqlite:///:memory:")

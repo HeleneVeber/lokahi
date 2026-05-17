@@ -3,8 +3,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlmodel import Field, SQLModel, select
 from app.database import get_session
 from app.models.address import Address
-from app.models.gestor import Gestor
-from app.types import AddressData, GestorData
+from app.models import Gestor, GestorData
+from app.types import AddressData
 from app.utils.import_utils import parse_phone
 from app.utils.viacep import fetch_address
 
@@ -86,7 +86,7 @@ class Imovel(SQLModel, table=True):
 
                         gestor_id = None
                         if imovel["cpf_gestor"]:
-                            gestor = Gestor.get_or_create(
+                            gestor, _ = Gestor.get_or_create(
                                 session,
                                 GestorData(
                                     cpf_cnpj=imovel["cpf_gestor"],

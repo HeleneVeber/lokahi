@@ -4,9 +4,9 @@ from sqlmodel import select
 
 from app.database import create_db_and_tables, get_session
 from app.models.address import Address
-from app.models.gestor import Gestor
+from app.models import Gestor, GestorData
 from app.models.imovel import Imovel
-from app.types import AddressData, GestorData
+from app.types import AddressData
 from app.utils.import_utils import import_file
 from app.utils.viacep import fetch_address
 

@@ -4,7 +4,7 @@ from unittest.mock import patch
 from sqlmodel import SQLModel, Session, create_engine, select
 
 from app.models.address import Address
-from app.models.gestor import Gestor
+from app.models import Gestor
 from app.models.imovel import Imovel
 from app.types import ViaCepData
 from app.utils.import_utils import import_file
