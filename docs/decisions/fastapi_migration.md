@@ -42,12 +42,26 @@ class Gestor(GestorBase, table=True):  # entité DB
 Note : `GestorCreate.name` sera `str` (obligatoire), contrairement à `GestorData.name`
 qui est `str | None` pour supporter le cas "gestor existant sans nom fourni".
 
-### 3 — `display()` à supprimer
+**Pourquoi `GestorBase` est absent du MVP :** un seul héritier (`Gestor`) ne justifie pas
+une base intermédiaire. En FastAPI, `GestorCreate` et `GestorPublic` justifient son introduction.
+
+### 3 — `AddressData` rester découplé de `ViaCepData`
+
+`ViaCepData` est un schéma de réponse API externe (ViaCEP). `AddressData` est un DTO de domaine.
+Ces deux objets ont les mêmes champs aujourd'hui — c'est une coïncidence, pas une relation d'héritage.
+
+En FastAPI, maintenir la séparation :
+- `ViaCepData` reste dans `utils/viacep.py` ou `types.py` — contrat API externe
+- `AddressData` / `AddressCreate` restent indépendants — contrat domaine
+
+Si ViaCEP change son format de réponse, le domaine ne doit pas casser.
+
+### 4 — `display()` à supprimer
 
 `display()` mélange logique de présentation dans le modèle.
 En FastAPI, remplacer par le schéma `GestorPublic` sérialisé automatiquement.
 
-### 4 — Base de données
+### 5 — Base de données
 
 SQLite → PostgreSQL schema-per-tenant (voir CLAUDE.md).
 Le code SQLAlchemy/SQLModel ne change pas — seule la connexion change.

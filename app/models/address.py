@@ -1,6 +1,15 @@
+from pydantic import BaseModel
 from sqlmodel import Field, SQLModel, select
-from app.types import AddressData
 
+
+class AddressData(BaseModel):
+    cep: str
+    logradouro: str
+    numero: str
+    complemento: str | None = None
+    bairro: str
+    localidade: str
+    uf: str
 
 class Address(SQLModel, table=True):
     __table_args__ = {"extend_existing": True}

@@ -7,8 +7,3 @@ class ViaCepData(BaseModel):
     bairro: str
     localidade: str
     uf: str
-
-
-class AddressData(ViaCepData):
-    numero: str
-    complemento: str | None = None

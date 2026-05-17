@@ -1,7 +1,5 @@
 from sqlmodel import SQLModel, Session, create_engine, select
-
-from app.models.address import Address
-from app.types import AddressData
+from app.models import Address, AddressData
 
 engine = create_engine("sqlite:///:memory:")
 
