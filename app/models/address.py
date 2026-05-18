@@ -1,5 +1,6 @@
+from typing import Optional
 from pydantic import BaseModel
-from sqlmodel import Field, SQLModel, select
+from sqlmodel import Field, Relationship, SQLModel, select
 
 
 class AddressData(BaseModel):
@@ -21,6 +22,8 @@ class Address(SQLModel, table=True):
     bairro: str
     localidade: str
     uf: str
+
+    imovel: Optional["Imovel"] = Relationship(back_populates="address")
 
     def format(self) -> str:
         complemento = f", {self.complemento}" if self.complemento else ""

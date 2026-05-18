@@ -58,18 +58,18 @@ if st.session_state.show_form:
 
         if submitted:
             try:
-                gestor, created = Gestor.get_or_create(
-                    session,
-                    GestorData(name=name, cpf_cnpj=cpf_cnpj, phone=phone or None),
-                )
-                if not created:
-                    st.error("Este CPF/CNPJ já está cadastrado.")
-                else:
-                    session.commit()
-                    session.close()
-                    st.session_state.success_message = f"Gestor {name} adicionado com sucesso!"
-                    st.session_state.show_form = False
-                    st.rerun()
+                with get_session() as session:
+                    gestor, created = Gestor.get_or_create(
+                        session,
+                        GestorData(name=name, cpf_cnpj=cpf_cnpj, phone=phone or None),
+                    )
+                    if not created:
+                        st.error("Este CPF/CNPJ já está cadastrado.")
+                    else:
+                        session.commit()
+                        st.session_state.success_message = f"Gestor {name} adicionado com sucesso!"
+                        st.session_state.show_form = False
+                        st.rerun()
             except ValueError as e:
                 st.error(str(e))
             except Exception as e:

@@ -1,8 +1,10 @@
 import re
-from sqlalchemy.orm import validates
-from sqlmodel import Field, SQLModel, select
+
 from pydantic import BaseModel
+from sqlalchemy.orm import validates
+from sqlmodel import Field, Relationship, SQLModel, select
 from validate_docbr import CNPJ, CPF
+
 from app.database import get_session
 from app.utils.import_utils import parse_phone
 
@@ -19,6 +21,8 @@ class Gestor(SQLModel, table=True):
     name: str
     cpf_cnpj: str = Field(unique=True)
     phone: str | None = None
+
+    imoveis: list["Imovel"] = Relationship(back_populates="gestor")  # type: ignore[assignment]
 
     def display(self) -> dict:
         return {"Nome": self.name, "CPF/CNPJ": self.cpf_cnpj, "Telefone": self.phone}

@@ -1,12 +1,12 @@
 import streamlit as st
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import selectinload
 from sqlmodel import select
+
 from app.database import create_db_and_tables, get_session
-from app.models import Address, AddressData, Gestor, GestorData
-from app.models.imovel import Imovel
+from app.models import Gestor,  Imovel, ImovelData
 from app.utils.import_utils import import_file
 from app.utils.viacep import fetch_address
-
 
 st.title("Imóveis 🏢")
 st.write("Aqui você pode ler e gerenciar os imóveis")
@@ -15,14 +15,14 @@ st.write("Aqui você pode ler e gerenciar os imóveis")
 # DB connection
 create_db_and_tables()
 session = get_session()
-imoveis = session.exec(select(Imovel)).all()
+imoveis = session.exec(
+    select(Imovel).options(
+        selectinload(Imovel.gestor),  # type: ignore[arg-type]
+        selectinload(Imovel.address),  # type: ignore[arg-type]
+    )
+).all()
 gestores = session.exec(select(Gestor)).all()
-addresses = session.exec(select(Address)).all()
 session.close()
-
-gestor_map = {g.id: g.name for g in gestores}
-address_map = {a.id: a for a in addresses}
-
 
 # Initialize session state
 if "show_form" not in st.session_state:
@@ -31,19 +31,12 @@ if "show_form" not in st.session_state:
 if "show_upload" not in st.session_state:
     st.session_state.show_upload = False
 
+if "success_message" in st.session_state:
+    st.success(st.session_state.pop("success_message"))
 
 # Display imoveis table
 if imoveis:
-    st.dataframe([
-        {
-            "Nome": im.nome,
-            "Endereço": addr.format() if (addr := address_map.get(im.address_id)) else "—",
-            "Gestor": gestor_map.get(im.gestor_id, "—") if im.gestor_id else "—",
-            "Quartos": "—",
-            "Vazios": "—",
-        }
-        for im in imoveis
-    ])
+    st.dataframe([im.display() for im in imoveis])
 else:
     st.info("Nenhum imóvel cadastrado.")
 
@@ -53,12 +46,12 @@ col1, col2 = st.columns(2)
 
 with col1:
     if st.button("+ Novo Imóvel", width="stretch"):
-        st.session_state.show_form = True
+        st.session_state.show_form = not st.session_state.show_form
         st.session_state.address_data = None
 
 with col2:
     if st.button("+ Importar Imóveis", width="stretch"):
-        st.session_state.show_upload = True
+        st.session_state.show_upload = not st.session_state.show_upload
 
 
 # Form to add new imovel
@@ -103,40 +96,18 @@ if st.session_state.show_form:
                 st.error("Busque um CEP antes de salvar.")
             else:
                 try:
-                    session = get_session()
-                    address = Address.get_or_create(session, AddressData(
-                        cep=addr.cep,
-                        logradouro=addr.logradouro,
-                        numero=numero,
-                        complemento=complemento or None,
-                        bairro=addr.bairro,
-                        localidade=addr.localidade,
-                        uf=addr.uf,
-                    ))
-
-                    existing_imovel = session.exec(
-                        select(Imovel).where(Imovel.address_id == address.id)
-                    ).first()
-                    if existing_imovel:
-                        session.close()
-                        st.error(f"Este endereço já está cadastrado no imóvel '{existing_imovel.nome}'.")
-                    else:
-                        gestor_id = None
-                        if gestor_choice != "—":
-                            gestor_id = gestor_options[gestor_choice]
-                        elif cpf_gestor:
-                            gestor = Gestor.get_or_create(session, GestorData(
-                                cpf_cnpj=cpf_gestor,
-                                name=nome_gestor or None,
-                                phone=phone_gestor or None,
+                    with get_session() as session:
+                        imovel = Imovel.create(session, ImovelData(
+                            nome_imovel=nome,
+                            cep=addr.cep,
+                            numero=numero,
+                            complemento=complemento or None,
+                            gestor_id=gestor_options.get(gestor_choice) if gestor_choice != "—" else None,
+                            cpf_gestor=cpf_gestor or None,
+                            nome_gestor=nome_gestor or None,
+                            phone_gestor=phone_gestor or None,
                             ))
-                            session.flush()
-                            gestor_id = gestor.id
-
-                        imovel = Imovel(nome=nome, gestor_id=gestor_id, address_id=address.id)
-                        session.add(imovel)
                         session.commit()
-                        session.close()
                         st.success(f"Imóvel {nome} adicionado com sucesso!")
                         st.session_state.show_form = False
                         st.session_state.address_data = None

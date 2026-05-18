@@ -5,7 +5,7 @@ from sqlmodel import SQLModel, Session, create_engine, select
 
 from app.models.address import Address
 from app.models import Gestor
-from app.models.imovel import Imovel
+from app.models.imovel import Imovel, ImovelData
 from app.types import ViaCepData
 from app.utils.import_utils import import_file
 
@@ -39,59 +39,45 @@ def _make_csv(rows: list[dict]) -> io.BytesIO:
     return buf
 
 
-# --- validate_rows (fetch_address mocké, sans DB) ---
+# --- validate_rows (sans DB, sans fetch_address) ---
 
 def test_validate_rows_valid():
     df = pd.DataFrame([{"nome_imovel": "Ed Central", "cep": "01310-100", "numero": "100"}])
-    with patch("app.models.imovel.fetch_address", return_value=VIACEP_RESPONSE):
-        valid, errors = Imovel.validate_rows(df)
+    valid, errors = Imovel.validate_rows(df)
     assert len(valid) == 1
     assert errors == []
-    assert valid[0]["nome_imovel"] == "Ed Central"
-    assert valid[0]["address"] == VIACEP_RESPONSE
+    assert valid[0].nome_imovel == "Ed Central"
+    assert valid[0].cep == "01310-100"
 
 
 def test_validate_rows_missing_nome_imovel():
     df = pd.DataFrame([{"cep": "01310-100", "numero": "100"}])
-    with patch("app.models.imovel.fetch_address", return_value=VIACEP_RESPONSE):
-        valid, errors = Imovel.validate_rows(df)
+    valid, errors = Imovel.validate_rows(df)
     assert valid == []
     assert "nome_imovel" in errors[0]["error"]
 
 
 def test_validate_rows_missing_cep():
     df = pd.DataFrame([{"nome_imovel": "Ed Central", "numero": "100"}])
-    with patch("app.models.imovel.fetch_address", return_value=VIACEP_RESPONSE):
-        valid, errors = Imovel.validate_rows(df)
+    valid, errors = Imovel.validate_rows(df)
     assert valid == []
     assert "cep" in errors[0]["error"]
 
 
 def test_validate_rows_missing_numero():
     df = pd.DataFrame([{"nome_imovel": "Ed Central", "cep": "01310-100"}])
-    with patch("app.models.imovel.fetch_address", return_value=VIACEP_RESPONSE):
-        valid, errors = Imovel.validate_rows(df)
+    valid, errors = Imovel.validate_rows(df)
     assert valid == []
     assert "numero" in errors[0]["error"]
 
 
-def test_validate_rows_invalid_cep():
-    df = pd.DataFrame([{"nome_imovel": "Ed Central", "cep": "00000-000", "numero": "100"}])
-    with patch("app.models.imovel.fetch_address", side_effect=ValueError("CEP não encontrado")):
-        valid, errors = Imovel.validate_rows(df)
-    assert valid == []
-    assert len(errors) == 1
-    assert "CEP" in errors[0]["error"]
-
-
 def test_validate_rows_optional_fields_absent():
     df = pd.DataFrame([{"nome_imovel": "Ed Central", "cep": "01310-100", "numero": "100"}])
-    with patch("app.models.imovel.fetch_address", return_value=VIACEP_RESPONSE):
-        valid, errors = Imovel.validate_rows(df)
-    assert valid[0]["complemento"] is None
-    assert valid[0]["cpf_gestor"] is None
-    assert valid[0]["nome_gestor"] is None
-    assert valid[0]["phone_gestor"] is None
+    valid, errors = Imovel.validate_rows(df)
+    assert valid[0].complemento is None
+    assert valid[0].cpf_gestor is None
+    assert valid[0].nome_gestor is None
+    assert valid[0].phone_gestor is None
 
 
 # --- save_many via import_file (fetch_address + get_session mockés) ---
@@ -107,6 +93,16 @@ def test_import_valid_without_gestor():
         imovel = session.exec(select(Imovel)).first()
     assert imovel.nome == "Ed Central"
     assert imovel.gestor_id is None
+
+
+def test_import_invalid_cep():
+    file = _make_csv([{"nome_imovel": "Ed Central", "cep": "00000-000", "numero": "100"}])
+    with patch("app.models.imovel.fetch_address", side_effect=ValueError("CEP não encontrado")), \
+         patch("app.models.imovel.get_session", return_value=Session(engine)):
+        result = import_file(file, Imovel)
+    assert result["imported"] == 0
+    assert len(result["errors"]) == 1
+    assert "CEP" in result["errors"][0]["error"]
 
 
 def test_import_links_existing_gestor():
