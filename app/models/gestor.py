@@ -7,6 +7,7 @@ from validate_docbr import CNPJ, CPF
 
 from app.database import get_session
 from app.utils.import_utils import parse_phone
+from app.types import GestorData
 
 
 class GestorData(BaseModel):

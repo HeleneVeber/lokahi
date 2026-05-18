@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from sqlmodel import Field, Relationship, SQLModel, select
 
 
+
 class AddressData(BaseModel):
     cep: str
     logradouro: str
