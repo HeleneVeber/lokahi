@@ -1,12 +1,19 @@
 import re
-from typing import Self
-from sqlalchemy.exc import IntegrityError
+
+from pydantic import BaseModel
 from sqlalchemy.orm import validates
-from sqlmodel import Field, SQLModel, select
+from sqlmodel import Field, Relationship, SQLModel, select
 from validate_docbr import CNPJ, CPF
+
 from app.database import get_session
 from app.utils.import_utils import parse_phone
 from app.types import GestorData
+
+
+class GestorData(BaseModel):
+    cpf_cnpj: str
+    name: str | None = None
+    phone: str | None = None
 
 
 class Gestor(SQLModel, table=True):
@@ -16,8 +23,13 @@ class Gestor(SQLModel, table=True):
     cpf_cnpj: str = Field(unique=True)
     phone: str | None = None
 
+    imoveis: list["Imovel"] = Relationship(back_populates="gestor")  # type: ignore[assignment]
+
+    def display(self) -> dict:
+        return {"Nome": self.name, "CPF/CNPJ": self.cpf_cnpj, "Telefone": self.phone}
+
     @validates("cpf_cnpj")
-    def validate_cpf_cnpj(self, key: str, value: str) -> str:
+    def validate_cpf_cnpj(self, _: str, value: str) -> str:
         digits = re.sub(r"\D", "", value)
         if len(digits) == 11 and CPF().validate(value):
             return value
@@ -26,14 +38,12 @@ class Gestor(SQLModel, table=True):
         raise ValueError("CPF/CNPJ inválido")
 
     @classmethod
-    def get_or_create(cls, session, gestor: GestorData) -> "Gestor":
+    def get_or_create(cls, session, gestor: GestorData) -> tuple["Gestor", bool]:
         existing = session.exec(
-            select(cls).where(
-                cls.cpf_cnpj == gestor.cpf_cnpj
-                )
-            ).first()
+            select(cls).where(cls.cpf_cnpj == gestor.cpf_cnpj)
+        ).first()
         if existing:
-            return existing
+            return existing, False
 
         if not gestor.name:
             raise ValueError(f"Nome obrigatório para novo gestor com CPF/CNPJ {gestor.cpf_cnpj}")
@@ -42,16 +52,14 @@ class Gestor(SQLModel, table=True):
         session.add(new)
         session.flush()
 
-        return new
+        return new, True
 
 
     # Check if the file are all required columns and if the values are valid (e.g. cpf_cnpj format, phone number)
     @classmethod
-    def validate_rows(cls, dataframe) -> tuple[list[Self], list[dict[str, str | None]]]:
-        required = {
-            key for key, field in cls.model_fields.items() if field.is_required()
-        }
-        missing = required - set(dataframe.columns)
+    def validate_rows(cls, df) -> tuple[list[GestorData], list[dict[str, str | None]]]:
+        required = {"name", "cpf_cnpj"}
+        missing = required - set(df.columns)
 
         if missing:
             return [], [
@@ -62,10 +70,10 @@ class Gestor(SQLModel, table=True):
             ]
 
         valid, errors = [], []
-        for _, row in dataframe.iterrows():
+        for _, row in df.iterrows():
             try:
                 valid.append(
-                    cls(
+                    GestorData(
                         name=str(row["name"]),
                         cpf_cnpj=str(row["cpf_cnpj"]),
                         phone=parse_phone(row.get("phone")),
@@ -78,20 +86,20 @@ class Gestor(SQLModel, table=True):
 
     @classmethod
     def save_many(
-        cls, instances: list[Self]
+        cls, gestores: list[GestorData]
     ) -> tuple[int, list[dict[str, str | None]]]:
         imported = 0
         errors = []
         with get_session() as session:
-            for instance in instances:
+            for gestor in gestores:
                 try:
                     # savepoint: if this row fails, only this row is rolled back
                     with session.begin_nested():
-                        session.add(instance)
-                        # flush sends SQL to DB without committing — triggers IntegrityError early
-                        session.flush()
-                    imported += 1
-                except IntegrityError:
-                    errors.append({"row": instance.name, "error": "CPF/CNPJ já cadastrado"})
+                        _, created = cls.get_or_create(session, gestor)
+                        if not created:
+                            raise ValueError("CPF/CNPJ já cadastrado")
+                        imported += 1
+                except ValueError as e:
+                    errors.append({"row": gestor.name, "error": str(e)})
             session.commit()
         return imported, errors

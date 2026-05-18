@@ -1,6 +1,17 @@
-from sqlmodel import Field, SQLModel, select
-from app.types import AddressData
+from typing import Optional
+from pydantic import BaseModel
+from sqlmodel import Field, Relationship, SQLModel, select
 
+
+
+class AddressData(BaseModel):
+    cep: str
+    logradouro: str
+    numero: str
+    complemento: str | None = None
+    bairro: str
+    localidade: str
+    uf: str
 
 class Address(SQLModel, table=True):
     __table_args__ = {"extend_existing": True}
@@ -12,6 +23,8 @@ class Address(SQLModel, table=True):
     bairro: str
     localidade: str
     uf: str
+
+    imovel: Optional["Imovel"] = Relationship(back_populates="address")
 
     def format(self) -> str:
         complemento = f", {self.complemento}" if self.complemento else ""

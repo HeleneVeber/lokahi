@@ -1,8 +1,7 @@
 import streamlit as st
-from sqlalchemy.exc import IntegrityError
 from sqlmodel import select
 from app.database import create_db_and_tables, get_session
-from app.models.gestor import Gestor
+from app.models import Gestor, GestorData
 from app.utils.import_utils import import_file
 
 
@@ -24,18 +23,14 @@ if "show_form" not in st.session_state:
 if "show_upload" not in st.session_state:
     st.session_state.show_upload = False
 
+if "success_message" in st.session_state:
+    st.success(st.session_state.pop("success_message"))
+
 
 # Display gestores in a table
 if gestores:
     st.dataframe(
-        [
-            {
-                "Nome": g.name,
-                "CPF/CNPJ": g.cpf_cnpj,
-                "Telefone": g.phone if g.phone else None,
-            }
-            for g in gestores
-        ],
+        [g.display() for g in gestores],
     )
 else:
     st.info("Nenhum gestor cadastrado.")
@@ -46,11 +41,11 @@ col1, col2 = st.columns(2)
 
 with col1:
     if st.button("+ Novo Gestor", width="stretch"):
-        st.session_state.show_form = True
+        st.session_state.show_form = not st.session_state.show_form
 
 with col2:
     if st.button("+ Importar Gestores", width="stretch"):
-        st.session_state.show_upload = True
+        st.session_state.show_upload = not st.session_state.show_upload
 
 
 # Form to add new gestor
@@ -63,18 +58,20 @@ if st.session_state.show_form:
 
         if submitted:
             try:
-                gestor = Gestor(name=name, cpf_cnpj=cpf_cnpj, phone=phone)
-                session = get_session()
-                session.add(gestor)
-                session.commit()
-                session.close()
-                st.success(f"Gestor {name} adicionado com sucesso!")
-                st.session_state.show_form = False
-                st.rerun()
+                with get_session() as session:
+                    gestor, created = Gestor.get_or_create(
+                        session,
+                        GestorData(name=name, cpf_cnpj=cpf_cnpj, phone=phone or None),
+                    )
+                    if not created:
+                        st.error("Este CPF/CNPJ já está cadastrado.")
+                    else:
+                        session.commit()
+                        st.session_state.success_message = f"Gestor {name} adicionado com sucesso!"
+                        st.session_state.show_form = False
+                        st.rerun()
             except ValueError as e:
                 st.error(str(e))
-            except IntegrityError:
-                st.error("Este CPF/CNPJ já está cadastrado.")
             except Exception as e:
                 st.error(f"Erro ao salvar: {str(e)}")
 
