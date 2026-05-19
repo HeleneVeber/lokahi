@@ -4,7 +4,7 @@ from sqlalchemy.orm import selectinload
 from sqlmodel import select
 
 from app.database import create_db_and_tables, get_session
-from app.models import Gestor,  Imovel, ImovelData
+from app.models import Gestor, Imovel, ImovelData
 from app.utils.import_utils import import_file
 from app.utils.viacep import fetch_address
 
@@ -56,7 +56,6 @@ with col2:
 
 # Form to add new imovel
 if st.session_state.show_form:
-
     # CEP lookup — outside form because st.button ne fonctionne pas dans st.form
     cep_input = st.text_input("CEP")
     if st.button("Buscar endereço"):
@@ -67,11 +66,7 @@ if st.session_state.show_form:
 
     addr = st.session_state.get("address_data")
     if addr:
-        st.caption(
-            f"{addr.logradouro} — "
-            f"{addr.bairro} — "
-            f"{addr.localidade} / {addr.uf}"
-        )
+        st.caption(f"{addr.logradouro} — {addr.bairro} — {addr.localidade} / {addr.uf}")
 
     # Gestor selection — outside form so new gestor fields appear dynamically
     gestor_options = {g.name: g.id for g in gestores}
@@ -97,16 +92,21 @@ if st.session_state.show_form:
             else:
                 try:
                     with get_session() as session:
-                        imovel = Imovel.create(session, ImovelData(
-                            nome_imovel=nome,
-                            cep=addr.cep,
-                            numero=numero,
-                            complemento=complemento or None,
-                            gestor_id=gestor_options.get(gestor_choice) if gestor_choice != "—" else None,
-                            cpf_gestor=cpf_gestor or None,
-                            nome_gestor=nome_gestor or None,
-                            phone_gestor=phone_gestor or None,
-                            ))
+                        imovel = Imovel.create(
+                            session,
+                            ImovelData(
+                                nome_imovel=nome,
+                                cep=addr.cep,
+                                numero=numero,
+                                complemento=complemento or None,
+                                gestor_id=gestor_options.get(gestor_choice)
+                                if gestor_choice != "—"
+                                else None,
+                                cpf_gestor=cpf_gestor or None,
+                                nome_gestor=nome_gestor or None,
+                                phone_gestor=phone_gestor or None,
+                            ),
+                        )
                         session.commit()
                         st.success(f"Imóvel {nome} adicionado com sucesso!")
                         st.session_state.show_form = False
@@ -123,7 +123,9 @@ if st.session_state.show_upload:
     uploaded_file = st.file_uploader(
         "Importar CSV, XLS, XLSX", type=["csv", "xls", "xlsx"]
     )
-    st.caption("Colunas obrigatórias: `nome_imovel`, `cep`, `numero` — opcional: `complemento`, `cpf_cnpj_gestor`, `nome_gestor`, `telefone_gestor`")
+    st.caption(
+        "Colunas obrigatórias: `nome_imovel`, `cep`, `numero` — opcional: `complemento`, `cpf_cnpj_gestor`, `nome_gestor`, `telefone_gestor`"
+    )
     if uploaded_file is not None:
         if st.button("Confirmar importação"):
             st.session_state.import_result = import_file(uploaded_file, Imovel)

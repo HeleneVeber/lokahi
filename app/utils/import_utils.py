@@ -13,7 +13,7 @@ def import_file(file, model_class):
 
 
 # Check file extension to determine how to read it
-def _read_dataframe(file) -> pd.DataFrame | dict :
+def _read_dataframe(file) -> pd.DataFrame | dict:
     name = getattr(file, "name", "")
     ext = name.rsplit(".", 1)[-1].lower() if "." in name else ""
 
@@ -25,7 +25,7 @@ def _read_dataframe(file) -> pd.DataFrame | dict :
         return {
             "imported": 0,
             "errors": [
-                {"row": None, "error": f"Formato não suportado: use CSV, XLS ou XLSX."}
+                {"row": None, "error": "Formato não suportado: use CSV, XLS ou XLSX."}
             ],
         }
 

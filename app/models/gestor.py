@@ -1,4 +1,5 @@
 import re
+from typing import TYPE_CHECKING
 
 from pydantic import BaseModel
 from sqlalchemy.orm import validates
@@ -7,7 +8,9 @@ from validate_docbr import CNPJ, CPF
 
 from app.database import get_session
 from app.utils.import_utils import parse_phone
-from app.types import GestorData
+
+if TYPE_CHECKING:
+    from app.models.imovel import Imovel
 
 
 class GestorData(BaseModel):
@@ -23,7 +26,7 @@ class Gestor(SQLModel, table=True):
     cpf_cnpj: str = Field(unique=True)
     phone: str | None = None
 
-    imoveis: list["Imovel"] = Relationship(back_populates="gestor")  # type: ignore[assignment]
+    imoveis: list["Imovel"] = Relationship(back_populates="gestor")
 
     def display(self) -> dict:
         return {"Nome": self.name, "CPF/CNPJ": self.cpf_cnpj, "Telefone": self.phone}
@@ -46,14 +49,15 @@ class Gestor(SQLModel, table=True):
             return existing, False
 
         if not gestor.name:
-            raise ValueError(f"Nome obrigatório para novo gestor com CPF/CNPJ {gestor.cpf_cnpj}")
+            raise ValueError(
+                f"Nome obrigatório para novo gestor com CPF/CNPJ {gestor.cpf_cnpj}"
+            )
 
         new = cls(**gestor.model_dump())
         session.add(new)
         session.flush()
 
         return new, True
-
 
     # Check if the file are all required columns and if the values are valid (e.g. cpf_cnpj format, phone number)
     @classmethod
