@@ -1,12 +1,18 @@
+from typing import TYPE_CHECKING
+
 import pandas as pd
 from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Field, Relationship, SQLModel, select
+
 from app.database import get_session
 from app.models.address import Address, AddressData
 from app.models.gestor import Gestor, GestorData
 from app.utils.import_utils import parse_phone
 from app.utils.viacep import fetch_address
+
+if TYPE_CHECKING:
+    from app.models.quarto import Quarto
 
 
 class ImovelData(BaseModel):
@@ -29,6 +35,15 @@ class Imovel(SQLModel, table=True):
 
     gestor: Gestor | None = Relationship(back_populates="imoveis")
     address: Address = Relationship(back_populates="imovel")
+    quartos: list["Quarto"] = Relationship(back_populates="imovel")  # type: ignore[assignment]
+
+    @property
+    def is_coliving(self) -> bool:
+        return len(self.quartos) > 0
+
+    @property
+    def total_quartos(self) -> int:
+        return len(self.quartos)
 
     def display(self) -> dict:
         return {
@@ -91,15 +106,25 @@ class Imovel(SQLModel, table=True):
 
         valid = []
         for _, row in df.iterrows():
-            valid.append(ImovelData(
-                nome_imovel=str(row["nome_imovel"]),
-                cep=str(row["cep"]),
-                numero=str(row["numero"]),
-                complemento=str(row["complemento"]) if pd.notna(row.get("complemento")) else None,
-                cpf_gestor=str(row["cpf_gestor"]) if pd.notna(row.get("cpf_gestor")) else None,
-                nome_gestor=str(row["nome_gestor"]) if pd.notna(row.get("nome_gestor")) else None,
-                phone_gestor=parse_phone(row.get("phone_gestor")) if pd.notna(row.get("phone_gestor")) else None,
-            ))
+            valid.append(
+                ImovelData(
+                    nome_imovel=str(row["nome_imovel"]),
+                    cep=str(row["cep"]),
+                    numero=str(row["numero"]),
+                    complemento=str(row["complemento"])
+                    if pd.notna(row.get("complemento"))
+                    else None,
+                    cpf_gestor=str(row["cpf_gestor"])
+                    if pd.notna(row.get("cpf_gestor"))
+                    else None,
+                    nome_gestor=str(row["nome_gestor"])
+                    if pd.notna(row.get("nome_gestor"))
+                    else None,
+                    phone_gestor=parse_phone(row.get("phone_gestor"))
+                    if pd.notna(row.get("phone_gestor"))
+                    else None,
+                )
+            )
 
         return valid, []
 

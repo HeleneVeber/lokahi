@@ -1,6 +1,10 @@
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
+
 from pydantic import BaseModel
 from sqlmodel import Field, Relationship, SQLModel, select
+
+if TYPE_CHECKING:
+    from app.models.imovel import Imovel
 
 
 

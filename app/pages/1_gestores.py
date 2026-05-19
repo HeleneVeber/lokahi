@@ -1,9 +1,9 @@
 import streamlit as st
 from sqlmodel import select
+
 from app.database import create_db_and_tables, get_session
 from app.models import Gestor, GestorData
 from app.utils.import_utils import import_file
-
 
 st.title("Gestores de Coliving 🏠")
 st.write("Aqui você pode ler e gerenciar os gestores de coliving")
@@ -67,7 +67,9 @@ if st.session_state.show_form:
                         st.error("Este CPF/CNPJ já está cadastrado.")
                     else:
                         session.commit()
-                        st.session_state.success_message = f"Gestor {name} adicionado com sucesso!"
+                        st.session_state.success_message = (
+                            f"Gestor {name} adicionado com sucesso!"
+                        )
                         st.session_state.show_form = False
                         st.rerun()
             except ValueError as e:
