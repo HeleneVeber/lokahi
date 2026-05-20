@@ -3,7 +3,9 @@
 import pytest
 from decimal import Decimal
 from sqlmodel import Session, SQLModel, create_engine
-from app.models import Imovel, Quarto, Gestor, Address
+from app.models import Address, Gestor, Imovel, Quarto
+from app.schemas import ImovelData
+from app.services import ImovelService
 
 
 @pytest.fixture(name="session")

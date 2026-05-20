@@ -1,9 +1,12 @@
 import streamlit as st
 from sqlmodel import select
 
-from app.database import create_db_and_tables, get_session
-from app.models import Gestor, GestorData
+from app.database import create_db_and_tables, get_session, get_models
+from app.schemas import GestorData
+from app.services import GestorService
 from app.utils.import_utils import import_file
+
+Gestor = get_models()['Gestor']
 
 st.title("Gestores de Coliving 🏠")
 st.write("Aqui você pode ler e gerenciar os gestores de coliving")
@@ -11,9 +14,8 @@ st.write("Aqui você pode ler e gerenciar os gestores de coliving")
 
 # DB connection
 create_db_and_tables()
-session = get_session()
-gestores = session.exec(select(Gestor)).all()
-session.close()
+with get_session() as session:
+    gestores = session.exec(select(Gestor)).all()
 
 
 # Initialize session state
@@ -30,13 +32,16 @@ if "success_message" in st.session_state:
 # Display gestores in a table
 if gestores:
     st.dataframe(
-        [g.display() for g in gestores],
+        [
+            {"Nome": g.name, "CPF/CNPJ": g.cpf_cnpj, "Telefone": g.phone}
+            for g in gestores
+        ],
     )
 else:
     st.info("Nenhum gestor cadastrado.")
 
 
-# Show buttons sude by side
+# Show buttons side by side
 col1, col2 = st.columns(2)
 
 with col1:
@@ -59,7 +64,7 @@ if st.session_state.show_form:
         if submitted:
             try:
                 with get_session() as session:
-                    gestor, created = Gestor.get_or_create(
+                    gestor, created = GestorService.get_or_create(
                         session,
                         GestorData(name=name, cpf_cnpj=cpf_cnpj, phone=phone or None),
                     )
@@ -86,7 +91,7 @@ if st.session_state.show_upload:
     st.caption("Colunas obrigatórias: `name`, `cpf_cnpj` — opcional: `phone`")
     if uploaded_file is not None:
         if st.button("Confirmar importação"):
-            st.session_state.import_result = import_file(uploaded_file, Gestor)
+            st.session_state.import_result = import_file(uploaded_file, GestorService)
             st.session_state.show_upload = False
             st.rerun()
 

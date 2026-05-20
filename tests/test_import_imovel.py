@@ -3,9 +3,9 @@ import pandas as pd
 from unittest.mock import patch
 from sqlmodel import SQLModel, Session, create_engine, select
 
-from app.models.address import Address
-from app.models import Gestor
-from app.models.imovel import Imovel, ImovelData
+from app.models import Address, Gestor, Imovel
+from app.schemas import ImovelData
+from app.services import ImovelService
 from app.types import ViaCepData
 from app.utils.import_utils import import_file
 
@@ -43,7 +43,7 @@ def _make_csv(rows: list[dict]) -> io.BytesIO:
 
 def test_validate_rows_valid():
     df = pd.DataFrame([{"nome_imovel": "Ed Central", "cep": "01310-100", "numero": "100"}])
-    valid, errors = Imovel.validate_rows(df)
+    valid, errors = ImovelService.validate_rows(df)
     assert len(valid) == 1
     assert errors == []
     assert valid[0].nome_imovel == "Ed Central"
@@ -52,28 +52,28 @@ def test_validate_rows_valid():
 
 def test_validate_rows_missing_nome_imovel():
     df = pd.DataFrame([{"cep": "01310-100", "numero": "100"}])
-    valid, errors = Imovel.validate_rows(df)
+    valid, errors = ImovelService.validate_rows(df)
     assert valid == []
     assert "nome_imovel" in errors[0]["error"]
 
 
 def test_validate_rows_missing_cep():
     df = pd.DataFrame([{"nome_imovel": "Ed Central", "numero": "100"}])
-    valid, errors = Imovel.validate_rows(df)
+    valid, errors = ImovelService.validate_rows(df)
     assert valid == []
     assert "cep" in errors[0]["error"]
 
 
 def test_validate_rows_missing_numero():
     df = pd.DataFrame([{"nome_imovel": "Ed Central", "cep": "01310-100"}])
-    valid, errors = Imovel.validate_rows(df)
+    valid, errors = ImovelService.validate_rows(df)
     assert valid == []
     assert "numero" in errors[0]["error"]
 
 
 def test_validate_rows_optional_fields_absent():
     df = pd.DataFrame([{"nome_imovel": "Ed Central", "cep": "01310-100", "numero": "100"}])
-    valid, errors = Imovel.validate_rows(df)
+    valid, errors = ImovelService.validate_rows(df)
     assert valid[0].complemento is None
     assert valid[0].cpf_gestor is None
     assert valid[0].nome_gestor is None
@@ -84,9 +84,9 @@ def test_validate_rows_optional_fields_absent():
 
 def test_import_valid_without_gestor():
     file = _make_csv([{"nome_imovel": "Ed Central", "cep": "01310-100", "numero": "100"}])
-    with patch("app.models.imovel.fetch_address", return_value=VIACEP_RESPONSE), \
-         patch("app.models.imovel.get_session", return_value=Session(engine)):
-        result = import_file(file, Imovel)
+    with patch("app.services.imovel_service.fetch_address", return_value=VIACEP_RESPONSE), \
+         patch("app.services.imovel_service.get_session", return_value=Session(engine)):
+        result = import_file(file, ImovelService)
     assert result["imported"] == 1
     assert result["errors"] == []
     with Session(engine) as session:
@@ -97,9 +97,9 @@ def test_import_valid_without_gestor():
 
 def test_import_invalid_cep():
     file = _make_csv([{"nome_imovel": "Ed Central", "cep": "00000-000", "numero": "100"}])
-    with patch("app.models.imovel.fetch_address", side_effect=ValueError("CEP não encontrado")), \
-         patch("app.models.imovel.get_session", return_value=Session(engine)):
-        result = import_file(file, Imovel)
+    with patch("app.services.imovel_service.fetch_address", side_effect=ValueError("CEP não encontrado")), \
+         patch("app.services.imovel_service.get_session", return_value=Session(engine)):
+        result = import_file(file, ImovelService)
     assert result["imported"] == 0
     assert len(result["errors"]) == 1
     assert "CEP" in result["errors"][0]["error"]
@@ -113,9 +113,9 @@ def test_import_links_existing_gestor():
         gestor_id = gestor.id
 
     file = _make_csv([{"nome_imovel": "Ed Central", "cep": "01310-100", "numero": "100", "cpf_gestor": VALID_CPF}])
-    with patch("app.models.imovel.fetch_address", return_value=VIACEP_RESPONSE), \
-         patch("app.models.imovel.get_session", return_value=Session(engine)):
-        result = import_file(file, Imovel)
+    with patch("app.services.imovel_service.fetch_address", return_value=VIACEP_RESPONSE), \
+         patch("app.services.imovel_service.get_session", return_value=Session(engine)):
+        result = import_file(file, ImovelService)
     assert result["imported"] == 1
     with Session(engine) as session:
         imovel = session.exec(select(Imovel)).first()
@@ -127,9 +127,9 @@ def test_import_creates_new_gestor():
         "nome_imovel": "Ed Central", "cep": "01310-100", "numero": "100",
         "cpf_gestor": VALID_CPF, "nome_gestor": "João Silva",
     }])
-    with patch("app.models.imovel.fetch_address", return_value=VIACEP_RESPONSE), \
-         patch("app.models.imovel.get_session", return_value=Session(engine)):
-        result = import_file(file, Imovel)
+    with patch("app.services.imovel_service.fetch_address", return_value=VIACEP_RESPONSE), \
+         patch("app.services.imovel_service.get_session", return_value=Session(engine)):
+        result = import_file(file, ImovelService)
     assert result["imported"] == 1
     with Session(engine) as session:
         gestor = session.exec(select(Gestor)).first()
@@ -138,9 +138,9 @@ def test_import_creates_new_gestor():
 
 def test_import_error_new_gestor_without_nome():
     file = _make_csv([{"nome_imovel": "Ed Central", "cep": "01310-100", "numero": "100", "cpf_gestor": VALID_CPF}])
-    with patch("app.models.imovel.fetch_address", return_value=VIACEP_RESPONSE), \
-         patch("app.models.imovel.get_session", return_value=Session(engine)):
-        result = import_file(file, Imovel)
+    with patch("app.services.imovel_service.fetch_address", return_value=VIACEP_RESPONSE), \
+         patch("app.services.imovel_service.get_session", return_value=Session(engine)):
+        result = import_file(file, ImovelService)
     assert result["imported"] == 0
     assert result["errors"][0]["row"] == "Ed Central"
 
@@ -150,9 +150,9 @@ def test_import_duplicate_nome_imovel():
         {"nome_imovel": "Ed Central", "cep": "01310-100", "numero": "100"},
         {"nome_imovel": "Ed Central", "cep": "01310-100", "numero": "200"},
     ])
-    with patch("app.models.imovel.fetch_address", return_value=VIACEP_RESPONSE), \
-         patch("app.models.imovel.get_session", return_value=Session(engine)):
-        result = import_file(file, Imovel)
+    with patch("app.services.imovel_service.fetch_address", return_value=VIACEP_RESPONSE), \
+         patch("app.services.imovel_service.get_session", return_value=Session(engine)):
+        result = import_file(file, ImovelService)
     assert result["imported"] == 1
     assert len(result["errors"]) == 1
 
@@ -162,15 +162,15 @@ def test_import_duplicate_address():
         {"nome_imovel": "Ed Central", "cep": "01310-100", "numero": "100"},
         {"nome_imovel": "Ed Norte", "cep": "01310-100", "numero": "100"},
     ])
-    with patch("app.models.imovel.fetch_address", return_value=VIACEP_RESPONSE), \
-         patch("app.models.imovel.get_session", return_value=Session(engine)):
-        result = import_file(file, Imovel)
+    with patch("app.services.imovel_service.fetch_address", return_value=VIACEP_RESPONSE), \
+         patch("app.services.imovel_service.get_session", return_value=Session(engine)):
+        result = import_file(file, ImovelService)
     assert result["imported"] == 1
     assert len(result["errors"]) == 1
 
 
 def test_import_missing_column():
     file = _make_csv([{"nome_imovel": "Ed Central", "numero": "100"}])
-    result = import_file(file, Imovel)
+    result = import_file(file, ImovelService)
     assert result["imported"] == 0
     assert "cep" in result["errors"][0]["error"]
