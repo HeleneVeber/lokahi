@@ -1,61 +1,45 @@
-from typing import TYPE_CHECKING
+"""Service for Imovel business logic.
+
+⚠️ IMPORTANT - Streamlit Hot-Reload Pattern:
+All imports from app.models MUST be done inside methods (lazy imports)
+to avoid SQLAlchemy double-registration during Streamlit hot-reload.
+See CLAUDE.md section "Pattern Streamlit Hot-Reload" for details.
+"""
 
 import pandas as pd
-from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
-from sqlmodel import Field, Relationship, SQLModel, select
+from sqlmodel import Session, select
 
 from app.database import get_session
-from app.models.address import Address, AddressData
-from app.models.gestor import Gestor, GestorData
+from app.schemas import AddressData, GestorData, ImovelData
+from app.services.address_service import AddressService
+from app.services.gestor_service import GestorService
 from app.utils.import_utils import parse_phone
 from app.utils.viacep import fetch_address
 
-if TYPE_CHECKING:
-    from app.models.quarto import Quarto
 
+class ImovelService:
+    """Handles business logic for Imovel operations."""
 
-class ImovelData(BaseModel):
-    nome_imovel: str
-    cep: str
-    numero: str
-    complemento: str | None = None
-    gestor_id: int | None = None
-    cpf_gestor: str | None = None
-    nome_gestor: str | None = None
-    phone_gestor: str | None = None
+    @staticmethod
+    def create(session: Session, imovel: ImovelData):
+        """
+        Create a new imovel.
 
+        Args:
+            session: Database session
+            imovel: Imovel data
 
-class Imovel(SQLModel, table=True):
-    __table_args__ = {"extend_existing": True}
-    id: int | None = Field(default=None, primary_key=True)
-    nome: str = Field(unique=True)
-    gestor_id: int | None = Field(default=None, foreign_key="gestor.id")
-    address_id: int | None = Field(foreign_key="address.id")
+        Returns:
+            Created Imovel instance
 
-    gestor: Gestor | None = Relationship(back_populates="imoveis")
-    address: Address = Relationship(back_populates="imovel")
-    quartos: list["Quarto"] = Relationship(back_populates="imovel")  # type: ignore[assignment]
-
-    @property
-    def is_coliving(self) -> bool:
-        return len(self.quartos) > 0
-
-    @property
-    def total_quartos(self) -> int:
-        return len(self.quartos)
-
-    def display(self) -> dict:
-        return {
-            "Nome": self.nome,
-            "Endereço": self.address.format(),
-            "Gestor": self.gestor.name if self.gestor else "-",
-        }
-
-    @classmethod
-    def create(cls, session, imovel: ImovelData) -> "Imovel":
+        Raises:
+            ValueError: If address already exists for another imovel
+        """
+        from app.models import Imovel  # Lazy import to avoid hot-reload issues
+        
         viacep = fetch_address(imovel.cep)
-        address = Address.get_or_create(
+        address = AddressService.get_or_create(
             session,
             AddressData(
                 cep=viacep.cep,
@@ -67,14 +51,16 @@ class Imovel(SQLModel, table=True):
                 uf=viacep.uf,
             ),
         )
-        existing = session.exec(select(cls).where(cls.address_id == address.id)).first()
+
+        existing = session.exec(select(Imovel).where(Imovel.address_id == address.id)).first()
         if existing:
             raise ValueError(
                 f"Este endereço já está cadastrado no imóvel '{existing.nome}'"
             )
+
         gestor_id = imovel.gestor_id
         if gestor_id is None and imovel.cpf_gestor:
-            gestor, _ = Gestor.get_or_create(
+            gestor, _ = GestorService.get_or_create(
                 session,
                 GestorData(
                     cpf_cnpj=imovel.cpf_gestor,
@@ -84,15 +70,24 @@ class Imovel(SQLModel, table=True):
             )
             gestor_id = gestor.id
 
-        new_imovel = cls(
+        new_imovel = Imovel(
             nome=imovel.nome_imovel, gestor_id=gestor_id, address_id=address.id
         )
         session.add(new_imovel)
         session.flush()
         return new_imovel
 
-    @classmethod
-    def validate_rows(cls, df) -> tuple[list[ImovelData], list[dict[str, str | None]]]:
+    @staticmethod
+    def validate_rows(df) -> tuple[list[ImovelData], list[dict[str, str | None]]]:
+        """
+        Validate DataFrame rows for imovel import.
+
+        Args:
+            df: DataFrame with imovel data
+
+        Returns:
+            Tuple of (valid ImovelData list, error list)
+        """
         required = {"nome_imovel", "cep", "numero"}
         missing = required - set(df.columns)
 
@@ -128,21 +123,40 @@ class Imovel(SQLModel, table=True):
 
         return valid, []
 
-    @classmethod
+    @staticmethod
     def save_many(
-        cls, imoveis: list[ImovelData]
+        imoveis: list[ImovelData], session: Session | None = None
     ) -> tuple[int, list[dict[str, str | None]]]:
+        """
+        Save multiple imoveis to database.
+
+        Args:
+            imoveis: List of ImovelData to save
+            session: Optional session (for testing). If None, creates new session.
+
+        Returns:
+            Tuple of (imported count, error list)
+        """
         imported = 0
         errors = []
-        with get_session() as session:
+
+        def _save_in_session(sess: Session):
+            nonlocal imported, errors
             for imovel in imoveis:
                 try:
-                    with session.begin_nested():
-                        cls.create(session, imovel)
+                    with sess.begin_nested():
+                        ImovelService.create(sess, imovel)
                         imported += 1
 
                 except (ValueError, IntegrityError) as e:
                     errors.append({"row": imovel.nome_imovel, "error": str(e)})
 
-            session.commit()
+            sess.commit()
+
+        if session:
+            _save_in_session(session)
+        else:
+            with get_session() as sess:
+                _save_in_session(sess)
+
         return imported, errors

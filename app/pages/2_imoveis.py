@@ -1,12 +1,18 @@
+import pandas as pd
 import streamlit as st
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import selectinload
 from sqlmodel import select
 
-from app.database import create_db_and_tables, get_session
-from app.models import Gestor, Imovel, ImovelData
+from app.database import create_db_and_tables, get_session, get_models
+from app.schemas import ImovelData
+from app.services import ImovelService
 from app.utils.import_utils import import_file
 from app.utils.viacep import fetch_address
+
+
+models = get_models()
+Gestor = models['Gestor']
+Imovel = models['Imovel']
 
 st.title("Imóveis 🏢")
 st.write("Aqui você pode ler e gerenciar os imóveis")
@@ -14,15 +20,13 @@ st.write("Aqui você pode ler e gerenciar os imóveis")
 
 # DB connection
 create_db_and_tables()
-session = get_session()
-imoveis = session.exec(
-    select(Imovel).options(
-        selectinload(Imovel.gestor),  # type: ignore[arg-type]
-        selectinload(Imovel.address),  # type: ignore[arg-type]
-    )
-).all()
-gestores = session.exec(select(Gestor)).all()
-session.close()
+with get_session() as session:
+    imoveis = session.exec(select(Imovel)).all()
+    # Force load relations before session closes
+    for im in imoveis:
+        _ = im.gestor
+        _ = im.address
+    gestores = session.exec(select(Gestor)).all()
 
 # Initialize session state
 if "show_form" not in st.session_state:
@@ -36,7 +40,31 @@ if "success_message" in st.session_state:
 
 # Display imoveis table
 if imoveis:
-    st.dataframe([im.display() for im in imoveis])
+    df_data = [
+        {
+            "_id": im.id,
+            "Nome": im.nome,
+            "Endereço": im.address.format(),
+            "Gestor": im.gestor.name if im.gestor else "-",
+        }
+        for im in imoveis
+    ]
+    df = pd.DataFrame(df_data)
+
+    # Display with on_select for navigation
+    event = st.dataframe(
+        df.drop(columns=["_id"]),
+        on_select="rerun",
+        selection_mode="single-row",
+        use_container_width=True,
+    )
+
+    # Handle row selection
+    if event.selection.rows:
+        selected_id = df.iloc[event.selection.rows[0]]["_id"]
+        st.session_state.imovel_id = selected_id
+        st.switch_page("pages/3_imovel_details.py")
+
 else:
     st.info("Nenhum imóvel cadastrado.")
 
@@ -92,7 +120,7 @@ if st.session_state.show_form:
             else:
                 try:
                     with get_session() as session:
-                        imovel = Imovel.create(
+                        imovel = ImovelService.create(
                             session,
                             ImovelData(
                                 nome_imovel=nome,
@@ -128,7 +156,7 @@ if st.session_state.show_upload:
     )
     if uploaded_file is not None:
         if st.button("Confirmar importação"):
-            st.session_state.import_result = import_file(uploaded_file, Imovel)
+            st.session_state.import_result = import_file(uploaded_file, ImovelService)
             st.session_state.show_upload = False
             st.rerun()
 
@@ -141,3 +169,5 @@ if "import_result" in st.session_state:
     for err in result["errors"]:
         label = f"{err['row']} — " if err["row"] else ""
         st.error(f"{label}{err['error']}")
+
+# Test hot-reload

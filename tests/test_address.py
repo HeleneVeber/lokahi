@@ -1,5 +1,7 @@
 from sqlmodel import SQLModel, Session, create_engine, select
-from app.models import Address, AddressData
+from app.models import Address
+from app.schemas import AddressData
+from app.services import AddressService
 
 engine = create_engine("sqlite:///:memory:")
 
@@ -94,7 +96,7 @@ def test_delete_address():
 
 def test_get_or_create_creates_new():
     with Session(engine) as session:
-        address = Address.get_or_create(session, AddressData(**{**ADDRESS_DATA, "numero": "100"}))
+        address = AddressService.get_or_create(session, AddressData(**{**ADDRESS_DATA, "numero": "100"}))
         session.commit()
         address_id = address.id
 
@@ -112,7 +114,7 @@ def test_get_or_create_returns_existing():
         existing_id = existing.id
 
     with Session(engine) as session:
-        address = Address.get_or_create(session, AddressData(**ADDRESS_DATA))
+        address = AddressService.get_or_create(session, AddressData(**ADDRESS_DATA))
         session.commit()
         address_id = address.id
 
@@ -124,11 +126,11 @@ def test_get_or_create_returns_existing():
 
 def test_get_or_create_same_cep_different_numero():
     with Session(engine) as session:
-        Address.get_or_create(session, AddressData(**{**ADDRESS_DATA, "numero": "100"}))
+        AddressService.get_or_create(session, AddressData(**{**ADDRESS_DATA, "numero": "100"}))
         session.commit()
 
     with Session(engine) as session:
-        Address.get_or_create(session, AddressData(**{**ADDRESS_DATA, "numero": "200"}))
+        AddressService.get_or_create(session, AddressData(**{**ADDRESS_DATA, "numero": "200"}))
         session.commit()
 
     with Session(engine) as session:
@@ -138,7 +140,7 @@ def test_get_or_create_same_cep_different_numero():
 
 def test_get_or_create_with_complemento():
     with Session(engine) as session:
-        address = Address.get_or_create(session, AddressData(**{**ADDRESS_DATA, "numero": "100", "complemento": "Apto 1"}))
+        address = AddressService.get_or_create(session, AddressData(**{**ADDRESS_DATA, "numero": "100", "complemento": "Apto 1"}))
         session.commit()
         complemento = address.complemento
 
